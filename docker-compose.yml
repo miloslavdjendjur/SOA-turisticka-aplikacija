@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # DATABASE INFRASTRUCTURE
+  # ==========================================
+  
+  # PostgreSQL - Baza
+  postgres:
+    image: postgres:13-alpine
+    container_name: soa-postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: soa-db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - soa-network
+
+  # pgAdmin - Grafički interfejs
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: soa-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5051:80"
+    depends_on:
+      - postgres
+    networks:
+      - soa-network
+
+  # Neo4j - Graph Baza
+  neo4j:
+    image: neo4j:5.12.0
+    container_name: soa-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+    ports:
+      - "7474:7474"   # HTTP UI
+      - "7687:7687"   # Bolt protocol
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - soa-network
+
+  # NATS - Message Broker
+  nats:
+    image: nats:latest
+    container_name: soa-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - soa-network
+
+  # ==========================================
+  # MICROSERVICES
+  # ==========================================
+
+  # API Gateway (Go)
+  gateway:
+    build: ./gateway
+    container_name: soa-gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - stakeholders
+      - tours
+      - followers
+    networks:
+      - soa-network
+
+  # Stakeholders Service (Java + Spring Boot)
+  stakeholders:
+    build: ./stakeholders
+    container_name: soa-stakeholders
+    environment:
+      - SERVER_PORT=8081
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/soa-db
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    depends_on:
+      - postgres
+      - nats
+    networks:
+      - soa-network
+
+  # Followers Service (Go + Neo4j)
+  followers:
+    build: ./followers
+    container_name: soa-followers
+    environment:
+      - PORT=8083
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password
+    depends_on:
+      - neo4j
+    networks:
+      - soa-network
+
+  # Tours Service (Go + Postgres)
+  tours:
+    build: ./tours
+    container_name: soa-tours
+    environment:
+      - PORT=8082
+      - DB_HOST=postgres
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_NAME=soa-db
+      - DB_PORT=5432 
+      - FOLLOWERS_SERVICE_URL=http://followers:8083
+    depends_on:
+      - postgres
+    networks:
+      - soa-network
+
+volumes:
+  postgres_data:
+  neo4j_data:
+
+networks:
+  soa-network:
+    driver: bridge
