@@ -23,6 +23,9 @@ func main() {
 	r.Any("/tours", reverseProxy(toursTarget))
 	r.Any("/keypoints", reverseProxy(toursTarget))
 	r.Any("/blogs", reverseProxy(toursTarget))
+	r.Any("/tours/purchase", reverseProxy(toursTarget))
+	r.Any("/position", reverseProxy(toursTarget))
+	r.Any("/tours/start", reverseProxy(toursTarget))
 
 	// Rute za Followers (Go + Neo4j)
 	r.Any("/followers", reverseProxy(followersTarget))
