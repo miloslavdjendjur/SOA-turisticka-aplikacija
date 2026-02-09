@@ -14,6 +14,7 @@ func main() {
 	r.GET("/tours", GetTours)
 	r.POST("/keypoints", AddKeyPoint)
 	r.POST("/blogs", CreateBlog)
+	r.GET("/blogs", GetAllBlogs)
 	r.POST("/tours/purchase", BuyTour)     
 	r.POST("/position", UpdatePosition)    
 	r.POST("/tours/start", StartTour)     

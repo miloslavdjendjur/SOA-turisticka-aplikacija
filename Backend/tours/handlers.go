@@ -16,7 +16,7 @@ func CreateTour(c *gin.Context) {
 	}
 
 	input.Status = Draft
-	input.Price = 0
+	//input.Price = 0
 	input.Distance = 0
 
 	if err := DB.Create(&input).Error; err != nil {
@@ -25,6 +25,15 @@ func CreateTour(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, input)
+}
+
+func GetAllBlogs(c *gin.Context) {
+	var blogs []Blog
+	if err := DB.Find(&blogs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, blogs)
 }
 
 func AddKeyPoint(c *gin.Context) {
