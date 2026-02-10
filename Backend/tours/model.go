@@ -82,7 +82,7 @@ type TourExecution struct {
 	LastActivity time.Time `json:"lastActivity"`
 }
 
-// TACKA 16: KORPA I STAVKE
+
 type ShoppingCart struct {
 	ID         uint        `gorm:"primaryKey" json:"id"`
 	TouristID  int         `json:"touristId"`
