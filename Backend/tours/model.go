@@ -81,3 +81,19 @@ type TourExecution struct {
 	EndTime      time.Time `json:"endTime"`
 	LastActivity time.Time `json:"lastActivity"`
 }
+
+// TACKA 16: KORPA I STAVKE
+type ShoppingCart struct {
+	ID         uint        `gorm:"primaryKey" json:"id"`
+	TouristID  int         `json:"touristId"`
+	TotalPrice float64     `json:"totalPrice"`
+	Items      []OrderItem `gorm:"foreignKey:ShoppingCartID" json:"items"`
+}
+
+type OrderItem struct {
+	ID             uint    `gorm:"primaryKey" json:"id"`
+	ShoppingCartID uint    `json:"shoppingCartId"`
+	TourID         uint    `json:"tourId"`
+	TourName       string  `json:"tourName"`
+	Price          float64 `json:"price"`
+}

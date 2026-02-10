@@ -18,6 +18,11 @@ func main() {
 	r.POST("/tours/purchase", BuyTour)     
 	r.POST("/position", UpdatePosition)    
 	r.POST("/tours/start", StartTour)     
+	r.POST("/tours/end", EndTour)
+	r.POST("/tours/check", CheckProximity)
+	r.GET("/cart", GetCart)          
+	r.POST("/cart/add", AddToCart)   
+	r.POST("/cart/checkout", Checkout) 
 
 	r.Run(":8082")
 }

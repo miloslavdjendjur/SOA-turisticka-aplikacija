@@ -40,5 +40,5 @@ func ConnectDatabase() {
 	log.Println("Connected to database successfully!")
 
 	
-	DB.AutoMigrate(&Tour{}, &KeyPoint{}, &Blog{}, &TourPurchase{}, &TouristPosition{}, &TourExecution{})
+	DB.AutoMigrate(&Tour{}, &KeyPoint{}, &Blog{}, &TourPurchase{}, &TouristPosition{}, &TourExecution{}, &ShoppingCart{}, &OrderItem{})
 }
