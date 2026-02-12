@@ -1,35 +1,32 @@
 <div class="main-container">
   <div class="header">
-    <h1>🌍 SOA Projekat</h1>
-    
+    <h1>🌍 Turistička Aplikacija</h1>
     <div *ngIf="message" class="alert">{{ message }}</div>
-    
     <div *ngIf="currentUserId" class="user-info">
-      👤 ID: <strong>{{ currentUserId }}</strong> 
-      <span *ngIf="userProfile">({{ userProfile.username }})</span>
+      👤 {{ userProfile?.username }} (ID: {{ currentUserId }})
+      <button (click)="logout()" class="btn-warning" style="width: auto; margin-left:10px;">Odjavi se</button>
     </div>
-    <div *ngIf="!currentUserId" class="user-info red">🔴 Nisi ulogovan.</div>
   </div>
 
   <div class="tabs">
-    <button (click)="setTab('users')" [class.active]="activeTab === 'users'">👤 Profil</button>
-    <button (click)="setTab('social')" [class.active]="activeTab === 'social'">🤝 Social</button>
-    <button (click)="setTab('tours')" [class.active]="activeTab === 'tours'">🗺️ Mapa & Ture</button>
+    <button *ngIf="!currentUserId" (click)="setTab('auth')" [class.active]="activeTab === 'auth'">🔑 Prijava</button>
+    <button *ngIf="currentUserId" (click)="setTab('profile')" [class.active]="activeTab === 'profile'">👤 Profil</button>
+    <button *ngIf="currentUserId" (click)="setTab('social')" [class.active]="activeTab === 'social'">🤝 Social</button>
+    <button *ngIf="currentUserId" (click)="setTab('tours')" [class.active]="activeTab === 'tours'">🗺️ Ture & Mapa</button>
   </div>
 
-  <div *ngIf="activeTab === 'users'" class="tab-content">
+  <div *ngIf="activeTab === 'auth' && !currentUserId" class="tab-content">
     <div class="grid-wrapper">
-      <div class="card" style="border-top: 4px solid #28a745;">
-        <h3>🔑 Login</h3>
-        <p style="font-size:0.8em; color:#666">Unesi ID (npr. 1)</p>
-        <input class="input" type="number" placeholder="ID" [(ngModel)]="loginId">
+      <div class="card">
+        <h3>Login</h3>
+        <input class="input" placeholder="Username" [(ngModel)]="loginData.username">
+        <input class="input" type="password" placeholder="Password" [(ngModel)]="loginData.password">
         <button (click)="login()" class="btn-success">Uloguj se</button>
       </div>
-
       <div class="card">
-        <h3>📝 Registracija</h3>
+        <h3>Registracija</h3>
         <input class="input" placeholder="Username" [(ngModel)]="registerData.username">
-        <input class="input" placeholder="Password" type="password" [(ngModel)]="registerData.password">
+        <input class="input" type="password" placeholder="Password" [(ngModel)]="registerData.password">
         <input class="input" placeholder="Email" [(ngModel)]="registerData.email">
         <input class="input" placeholder="Ime" [(ngModel)]="registerData.name">
         <input class="input" placeholder="Prezime" [(ngModel)]="registerData.surname">
@@ -39,123 +36,111 @@
         </select>
         <button (click)="register()" class="btn-primary">Registruj se</button>
       </div>
-
-      <div class="card" *ngIf="userProfile">
-        <h3>✏️ Izmeni Profil</h3>
-        <label>Ime:</label>
-        <input class="input" [(ngModel)]="userProfile.name">
-        <label>Prezime:</label>
-        <input class="input" [(ngModel)]="userProfile.surname">
-        <textarea class="input" placeholder="Biografija..." [(ngModel)]="userProfile.biography"></textarea>
-        <button (click)="updateProfile()" class="btn-warning">💾 Sačuvaj</button>
-      </div>
     </div>
   </div>
 
-  <div *ngIf="activeTab === 'social'" class="tab-content">
+  <div *ngIf="activeTab === 'profile' && currentUserId" class="tab-content">
+    <div class="card" style="max-width: 600px; margin: 0 auto;">
+      <h3>Moj Profil</h3>
+      <div style="text-align:center;">
+        <img [src]="userProfile?.profilePicture || 'https://via.placeholder.com/150'" style="width:120px; height:120px; border-radius:50%; object-fit:cover;">
+      </div>
+      <input type="file" (change)="onFileSelected($event)" style="margin: 10px 0;">
+      <input class="input" placeholder="Ime" [(ngModel)]="userProfile.name">
+      <input class="input" placeholder="Prezime" [(ngModel)]="userProfile.surname">
+      <textarea class="input" placeholder="Biografija" [(ngModel)]="userProfile.biography"></textarea>
+      <button (click)="updateProfile()" class="btn-warning">Sačuvaj</button>
+    </div>
+  </div>
+
+  <div *ngIf="activeTab === 'social' && currentUserId" class="tab-content">
     <div class="grid-wrapper">
       <div class="card">
-        <h3>✍️ Blog</h3>
+        <h3>Novi Blog</h3>
         <input class="input" placeholder="Naslov" [(ngModel)]="blogData.title">
-        <textarea class="input" placeholder="Tekst..." [(ngModel)]="blogData.description"></textarea>
-        <button (click)="createBlog()" [disabled]="!currentUserId" class="btn-success">Objavi</button>
+        <textarea class="input" placeholder="Tekst" [(ngModel)]="blogData.description"></textarea>
+        <button (click)="createBlog()" class="btn-success">Objavi</button>
       </div>
-
       <div class="card">
-        <h3>👥 Follow</h3>
-        <input class="input" type="number" placeholder="ID Korisnika" [(ngModel)]="followId">
-        <button (click)="followUser()" [disabled]="!currentUserId" class="btn-primary">Zaprati</button>
-        <div *ngIf="followingList.length > 0"><small>Pratim: {{ followingList }}</small></div>
+        <h3>Prati korisnika</h3>
+        <input class="input" type="number" placeholder="ID korisnika" [(ngModel)]="followId">
+        <button (click)="followUser()" class="btn-primary">Zaprati</button>
+        <hr>
+        <h4>Preporuke:</h4>
+        <div *ngFor="let recId of recommendations" style="margin-bottom: 5px;">
+          ID: {{recId}} <button (click)="followUser(recId)" class="btn-success" style="width:auto; padding: 2px 10px;">+</button>
+        </div>
       </div>
     </div>
     <hr>
-    <h2>📰 Blogovi</h2>
-    <div class="tours-list">
-      <div *ngFor="let b of blogs" class="tour-item" style="border-left: 5px solid #ffc107;">
-        <h4>{{ b.title }}</h4>
-        <small>Autor ID: {{ b.authorId }}</small>
-        <p>{{ b.description }}</p>
+    <div *ngFor="let b of blogs" class="card" style="margin-bottom: 10px; border-left: 4px solid #ffc107;">
+      <h4>{{b.title}} <small>(Autor ID: {{b.authorId}})</small></h4>
+      <p>{{b.description}}</p>
+      <div class="comments-section">
+        <div *ngFor="let c of b.comments"><b>ID {{c.authorId}}:</b> {{c.text}}</div>
+        <div style="display:flex; gap:5px; margin-top:5px;">
+          <input class="input" style="margin-bottom:0;" placeholder="Komentar..." [(ngModel)]="newCommentText">
+          <button (click)="addComment(b.id)" class="btn-primary" style="width:auto;">Pošalji</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div *ngIf="activeTab === 'tours'" class="tab-content">
+  <div *ngIf="activeTab === 'tours' && currentUserId" class="tab-content">
     
     <div *ngIf="activeTourId" class="card active-tour-panel">
-      <h2 style="color: #0d47a1; margin-top:0;">🚀 Tura u toku (ID: {{activeTourId}})</h2>
-      <h3 style="color: #d32f2f;">{{ activeTourStatus }}</h3>
-      <p>Klikći po mapi da se krećeš. Sistem automatski proverava da li si blizu cilja.</p>
-      <button (click)="endTour()" class="btn-primary" style="background: #d32f2f; border-color: #b71c1c;">
-        🏁 Završi Turu
-      </button>
+        <h3>🚀 Aktivna tura (ID: {{activeTourId}})</h3>
+        <p><strong>Status:</strong> {{ activeTourStatus }}</p>
+        <button (click)="endTour()" class="btn-primary" style="background:#dc3545;">Završi</button>
+        <button (click)="abandonTour()" class="btn-primary" style="background:#dc3545;">Napusti turu</button>
+    
     </div>
+
 
     <div class="card cart-panel">
-      <h3>🛒 Tvoja Korpa</h3>
-      <div *ngIf="cart && cart.items && cart.items.length > 0">
-        <ul>
-          <li *ngFor="let item of cart.items">
-            {{ item.tourName }} - <b>{{ item.price }} RSD</b>
-          </li>
-        </ul>
-        <hr>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h4>Ukupno: {{ cart.totalPrice }} RSD</h4>
-          <button (click)="checkout()" class="btn-primary">💳 Checkout (Kupi Sve)</button>
+        <h3>🛒 Korpa</h3>
+        <div *ngIf="cart?.items?.length > 0">
+            <ul><li *ngFor="let item of cart.items">{{ item.tourName }} - {{ item.price }} RSD</li></ul>
+            <button (click)="checkout()" class="btn-success">Checkout (Kupi)</button>
         </div>
-      </div>
-      <div *ngIf="!cart || !cart.items || cart.items.length === 0">
-        <p>Korpa je prazna.</p>
-      </div>
+        <div *ngIf="!cart?.items?.length">Korpa je prazna.</div>
     </div>
 
-    <div class="card" style="width: 100%; margin-bottom: 20px;">
-      <h3>🌍 Mapa (Klikni za koordinate / kretanje)</h3>
-      <div id="map" style="height: 350px; width: 100%; border-radius: 5px; z-index: 1;"></div>
+    <div class="card" style="width:100%; margin-bottom: 20px;">
+        <div id="map" style="height:400px;"></div>
     </div>
 
     <div class="grid-wrapper">
-      <div class="card">
-        <h3>Nova Tura</h3>
-        <input class="input" placeholder="Naziv" [(ngModel)]="tourData.name">
-        <input class="input" placeholder="Opis" [(ngModel)]="tourData.description">
-        <input class="input" type="number" placeholder="Cena" [(ngModel)]="tourData.price">
-        <button (click)="createTour()" [disabled]="!currentUserId" class="btn-success">Kreiraj</button>
-      </div>
-
-      <div class="card">
-        <h3>Ključna Tačka</h3>
-        <input class="input" type="number" placeholder="ID Ture" [(ngModel)]="keyPointData.tourId">
-        <input class="input" placeholder="Naziv" [(ngModel)]="keyPointData.name">
-        <div style="display:flex; gap:5px;">
-          <input class="input" placeholder="Lat" [(ngModel)]="keyPointData.latitude" readonly style="background:#eee">
-          <input class="input" placeholder="Lng" [(ngModel)]="keyPointData.longitude" readonly style="background:#eee">
+        <div class="card">
+            <h3>Nova Tura</h3>
+            <input class="input" placeholder="Naziv" [(ngModel)]="tourData.name">
+            <input class="input" type="number" placeholder="Cena" [(ngModel)]="tourData.price">
+            <button (click)="createTour()" class="btn-success">Kreiraj</button>
         </div>
-        <button (click)="addKeyPoint()" class="btn-primary">Dodaj</button>
-      </div>
-
-      <div class="card">
-        <h3>Simulator</h3>
-        <div style="display:flex; gap:5px;">
-          <input class="input" placeholder="Lat" [(ngModel)]="simulator.latitude" readonly style="background:#eee">
-          <input class="input" placeholder="Lng" [(ngModel)]="simulator.longitude" readonly style="background:#eee">
+        <div class="card">
+            <h3>Dodaj tačku</h3>
+            <input class="input" type="number" placeholder="ID Ture" [(ngModel)]="keyPointData.tourId">
+            <input class="input" placeholder="Naziv" [(ngModel)]="keyPointData.name">
+            <button (click)="addKeyPoint()" class="btn-primary">Dodaj sa mape</button>
         </div>
-        <button (click)="updatePosition()" [disabled]="!currentUserId" class="btn-warning">📍 Ručno Ažuriraj</button>
-      </div>
+        <div class="card">
+            <h3>GPS Simulator</h3>
+            <p><small>Klikni na mapu da postaviš koordinate, pa potvrdi:</small></p>
+            <button (click)="updatePosition()" class="btn-warning">📍 Postavi moju poziciju</button>
+        </div>
     </div>
 
     <hr>
-    <h2>🗺️ Dostupne Ture</h2>
+    <h3>Dostupne Ture</h3>
     <div class="tours-list">
-      <div *ngFor="let t of tours" class="tour-item">
-        <h4>{{ t.name }} <span style="font-size:0.6em">#{{t.id}}</span></h4>
-        <p class="price">{{ t.price }} RSD</p>
-        <p>{{ t.description }}</p>
-        <div class="actions">
-          <button (click)="addToCart(t)" [disabled]="!currentUserId" class="btn-outline">🛒 Dodaj u Korpu</button>
-          <button (click)="startTour(t.id)" [disabled]="!currentUserId" class="btn-outline red">🚀 Pokreni</button>
+        <div *ngFor="let t of tours" class="tour-item">
+            <h4>{{ t.name }}</h4>
+            <p><strong>{{ t.price }} RSD</strong></p>
+            <div style="display:flex; gap:5px;">
+                <button (click)="addToCart(t)" class="btn-outline">🛒 Korpa</button>
+                <button (click)="startTour(t.id)" class="btn-outline red">🚀 Start</button>
+            </div>
         </div>
-      </div>
     </div>
   </div>
 </div>

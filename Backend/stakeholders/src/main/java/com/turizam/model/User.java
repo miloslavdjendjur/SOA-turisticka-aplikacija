@@ -25,6 +25,7 @@ public class User {
 
     private String name;
     private String surname;
+    @Column(columnDefinition="TEXT")
     private String profilePicture;
     private String biography;
     private String motto;

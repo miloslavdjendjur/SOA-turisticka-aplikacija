@@ -35,6 +35,7 @@ func CreateTour(c *gin.Context) {
 	}
 	input.Status = Draft
 	input.Distance = 0
+	input.Price = 0
 	if err := DB.Create(&input).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -42,12 +43,36 @@ func CreateTour(c *gin.Context) {
 	c.JSON(http.StatusCreated, input)
 }
 
+
 func GetAllBlogs(c *gin.Context) {
+	touristID := c.Query("userId")
+
+	if touristID == "" {
+		c.JSON(http.StatusOK, []Blog{}) 
+		return
+	}
+
+	followersURL := fmt.Sprintf("http://followers:8083/followers?userId=%s", touristID)
+	resp, err := http.Get(followersURL)
+	
+	var followedIDs []int
+	if err == nil && resp.StatusCode == 200 {
+		json.NewDecoder(resp.Body).Decode(&followedIDs)
+		resp.Body.Close()
+	}
+
+	var myID int
+	fmt.Sscanf(touristID, "%d", &myID)
+	followedIDs = append(followedIDs, myID)
+
+	
 	var blogs []Blog
-	if err := DB.Find(&blogs).Error; err != nil {
+	
+	if err := DB.Where("author_id IN ?", followedIDs).Find(&blogs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, blogs)
 }
 
@@ -139,42 +164,47 @@ func StartTour(c *gin.Context) {
 
 	var purchase TourPurchase
 	if err := DB.Where("tourist_id = ? AND tour_id = ?", exec.TouristID, exec.TourID).First(&purchase).Error; err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Morate prvo kupiti turu (Tacka 16)!"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Tura nije kupljena!"})
 		return
 	}
 
 	exec.Status = "STARTED"
 	exec.StartTime = time.Now()
 	exec.LastActivity = time.Now()
+
 	if err := DB.Create(&exec).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Greska pri kreiranju sesije"})
 		return
 	}
 	c.JSON(http.StatusCreated, exec)
 }
 
-
 func EndTour(c *gin.Context) {
 	var req struct {
-		TouristID int `json:"touristId"`
-		TourID    int `json:"tourId"`
+		TouristID int    `json:"touristId"`
+		TourID    int    `json:"tourId"`
+		Status    string `json:"status"` 
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+
 	var exec TourExecution
 	if err := DB.Where("tourist_id = ? AND tour_id = ? AND status = ?", req.TouristID, req.TourID, "STARTED").First(&exec).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Nema aktivne ture."})
+		c.JSON(404, gin.H{"error": "Nema aktivne sesije"})
 		return
 	}
-	exec.Status = "COMPLETED"
+
+	
+	exec.Status = req.Status 
 	exec.EndTime = time.Now()
 	exec.LastActivity = time.Now()
-	DB.Save(&exec)
-	c.JSON(http.StatusOK, gin.H{"message": "Tura zavrsena!", "execution": exec})
-}
 
+	DB.Save(&exec) 
+
+	c.JSON(http.StatusOK, gin.H{"message": "Sesija zavrsena", "status": exec.Status})
+}
 
 func CheckProximity(c *gin.Context) {
 	var req struct {
@@ -182,26 +212,25 @@ func CheckProximity(c *gin.Context) {
 		TourID    int `json:"tourId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-
 
 	var exec TourExecution
 	if err := DB.Where("tourist_id = ? AND tour_id = ? AND status = ?", req.TouristID, req.TourID, "STARTED").First(&exec).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Tura nije pokrenuta"})
+		c.JSON(404, gin.H{"error": "Sesija nije pronadjena"})
 		return
 	}
+
+	// Bez obzira na ishod, belezi se last activity (Tacka 17)
 	exec.LastActivity = time.Now()
 	DB.Save(&exec)
 
-
 	var pos TouristPosition
 	if err := DB.Where("tourist_id = ?", req.TouristID).First(&pos).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Nema pozicije turiste"})
+		c.JSON(400, gin.H{"error": "Lokacija nije pronadjena"})
 		return
 	}
-
 
 	var keypoints []KeyPoint
 	DB.Where("tour_id = ?", req.TourID).Find(&keypoints)
@@ -209,22 +238,49 @@ func CheckProximity(c *gin.Context) {
 	found := false
 	nearbyPoint := ""
 
-
 	for _, kp := range keypoints {
 		dist := calculateDistance(pos.Latitude, pos.Longitude, kp.Latitude, kp.Longitude)
-		if dist < 0.1 { 
+		if dist < 0.1 { // Blizu tacke (100m)
 			found = true
 			nearbyPoint = kp.Name
-
+			// Ovde bi se u sesiji dodalo da je tacka kompletirana
 			break
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"nearKeyPoint": found,
-		"pointName":    nearbyPoint,
-		"message":      "Provera izvrsena",
-	})
+	c.JSON(200, gin.H{"nearKeyPoint": found, "pointName": nearbyPoint})
+}
+
+func Checkout(c *gin.Context) {
+	var req struct {
+		TouristID int `json:"touristId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	var cart ShoppingCart
+	if err := DB.Preload("Items").Where("tourist_id = ?", req.TouristID).First(&cart).Error; err != nil {
+		c.JSON(400, gin.H{"error": "Korpa prazna"})
+		return
+	}
+
+	for _, item := range cart.Items {
+		purchase := TourPurchase{
+			TouristID:    req.TouristID,
+			TourID:       item.TourID,
+			Token:        fmt.Sprintf("TKN-%d", time.Now().UnixNano()),
+			PurchaseDate: time.Now(),
+		}
+		DB.Create(&purchase)
+	}
+
+	DB.Where("shopping_cart_id = ?", cart.ID).Delete(&OrderItem{})
+	cart.TotalPrice = 0
+	DB.Save(&cart)
+
+	c.JSON(200, gin.H{"message": "Kupljeno! Korpa je prazna."})
 }
 
 
@@ -275,49 +331,49 @@ func AddToCart(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Dodato u korpu"})
 }
 
-func Checkout(c *gin.Context) {
-	var req struct {
-		TouristID int `json:"touristId"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+// func Checkout(c *gin.Context) {
+// 	var req struct {
+// 		TouristID int `json:"touristId"`
+// 	}
+// 	if err := c.ShouldBindJSON(&req); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 		return
+// 	}
 
 
-	var cart ShoppingCart
-	if err := DB.Preload("Items").Where("tourist_id = ?", req.TouristID).First(&cart).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Korpa je prazna"})
-		return
-	}
+// 	var cart ShoppingCart
+// 	if err := DB.Preload("Items").Where("tourist_id = ?", req.TouristID).First(&cart).Error; err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Korpa je prazna"})
+// 		return
+// 	}
 
-	if len(cart.Items) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Korpa je prazna"})
-		return
-	}
+// 	if len(cart.Items) == 0 {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Korpa je prazna"})
+// 		return
+// 	}
 
 
-	for _, item := range cart.Items {
-		purchase := TourPurchase{
-			TouristID:    req.TouristID,
-			TourID:       item.TourID,
-			Token:        fmt.Sprintf("TOKEN-%d-%d-%d", req.TouristID, item.TourID, time.Now().Unix()),
-			PurchaseDate: time.Now(),
-		}
+// 	for _, item := range cart.Items {
+// 		purchase := TourPurchase{
+// 			TouristID:    req.TouristID,
+// 			TourID:       item.TourID,
+// 			Token:        fmt.Sprintf("TOKEN-%d-%d-%d", req.TouristID, item.TourID, time.Now().Unix()),
+// 			PurchaseDate: time.Now(),
+// 		}
 
-		var exists TourPurchase
-		if err := DB.Where("tourist_id = ? AND tour_id = ?", req.TouristID, item.TourID).First(&exists).Error; err != nil {
-			DB.Create(&purchase)
-		}
-	}
+// 		var exists TourPurchase
+// 		if err := DB.Where("tourist_id = ? AND tour_id = ?", req.TouristID, item.TourID).First(&exists).Error; err != nil {
+// 			DB.Create(&purchase)
+// 		}
+// 	}
 
 	
-	DB.Where("shopping_cart_id = ?", cart.ID).Delete(&OrderItem{})
-	cart.TotalPrice = 0
-	DB.Save(&cart)
+// 	DB.Where("shopping_cart_id = ?", cart.ID).Delete(&OrderItem{})
+// 	cart.TotalPrice = 0
+// 	DB.Save(&cart)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Uspešna kupovina! Tokeni generisani."})
-}
+// 	c.JSON(http.StatusOK, gin.H{"message": "Uspešna kupovina! Tokeni generisani."})
+// }
 
 func CreateComment(c *gin.Context) {
 	var comm Comment

@@ -6,6 +6,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
+import java.util.List;
+
+class LoginRequest {
+    public String username;
+    public String password;
+}
+
 
 @RestController
 @RequestMapping("/api/users")
@@ -43,5 +50,24 @@ public class UserController {
             userRepository.save(user);
             return ResponseEntity.ok(user);
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        Optional<User> userOptional = userRepository.findByUsername(loginRequest.username);
+        
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            
+            if (user.getPassword().equals(loginRequest.password)) {
+                return ResponseEntity.ok(user);
+            }
+        }
+        return ResponseEntity.status(401).body("Pogrešan username ili lozinka");
+    }
+
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
     }
 }
