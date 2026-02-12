@@ -44,15 +44,16 @@ func main() {
 	r.Any("/tours/check", reverseProxy(toursTarget))
 	r.Any("/cart", reverseProxy(toursTarget))
 	r.Any("/cart/*path", reverseProxy(toursTarget))
+	r.Any("/comments", reverseProxy(toursTarget))
 
 	// Rute za Followers (Go + Neo4j)
 	r.Any("/followers", reverseProxy(followersTarget))
+	r.Any("/followers/recommendations", reverseProxy(followersTarget))
 
 	log.Println("Gateway running on port 8000")
 	r.Run(":8000")
 }
 
-// Pomocna funkcija koja pravi Reverse Proxy
 func reverseProxy(target string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		remote, err := url.Parse(target)

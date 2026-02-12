@@ -22,7 +22,9 @@ func main() {
 	r.POST("/tours/check", CheckProximity)
 	r.GET("/cart", GetCart)          
 	r.POST("/cart/add", AddToCart)   
-	r.POST("/cart/checkout", Checkout) 
+	r.POST("/cart/checkout", Checkout)
+	r.POST("/comments", CreateComment)
+    r.GET("/comments", GetComments)
 
 	r.Run(":8082")
 }

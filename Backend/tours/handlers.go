@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"time"
+	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 )
@@ -316,4 +317,54 @@ func Checkout(c *gin.Context) {
 	DB.Save(&cart)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Uspešna kupovina! Tokeni generisani."})
+}
+
+func CreateComment(c *gin.Context) {
+	var comm Comment
+	if err := c.ShouldBindJSON(&comm); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+
+	var blog Blog
+	if err := DB.First(&blog, comm.BlogID).Error; err != nil {
+		c.JSON(404, gin.H{"error": "Blog ne postoji"})
+		return
+	}
+
+
+	if comm.AuthorID != blog.AuthorID {
+
+		followersURL := "http://followers:8083"
+		checkURL := fmt.Sprintf("%s/followers/check?followerId=%d&followedId=%d", followersURL, comm.AuthorID, blog.AuthorID)
+		
+		resp, err := http.Get(checkURL)
+		if err != nil || resp.StatusCode != 200 {
+			c.JSON(500, gin.H{"error": "Greska pri proveri pracenja"})
+			return
+		}
+		defer resp.Body.Close()
+
+		var result struct {
+			IsFollowing bool `json:"isFollowing"`
+		}
+		json.NewDecoder(resp.Body).Decode(&result)
+
+		if !result.IsFollowing {
+			c.JSON(403, gin.H{"error": "Morate zapratiti autora da biste komentarisali!"})
+			return
+		}
+	}
+
+	comm.DateCreated = time.Now()
+	DB.Create(&comm)
+	c.JSON(201, comm)
+}
+
+func GetComments(c *gin.Context) {
+	blogID := c.Query("blogId")
+	var comments []Comment
+	DB.Where("blog_id = ?", blogID).Find(&comments)
+	c.JSON(200, comments)
 }

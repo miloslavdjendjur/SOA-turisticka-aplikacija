@@ -97,3 +97,11 @@ type OrderItem struct {
 	TourName       string  `json:"tourName"`
 	Price          float64 `json:"price"`
 }
+
+type Comment struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	BlogID      uint      `json:"blogId"`
+	AuthorID    int       `json:"authorId"`   
+	Text        string    `json:"text"`
+	DateCreated time.Time `json:"dateCreated"`
+}
